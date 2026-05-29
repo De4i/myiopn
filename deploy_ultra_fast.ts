@@ -28,8 +28,8 @@ async function main() {
   // Existing deployed tokens
   const USDC = "0xAe69efe47ad3b3AEE2Be0c3A6eeA2bA9bc4a9284";
   const USDT = "0xd79Cf114127bE55bDD96b608662109B277DaBF8d";
-  const NBLAD = "0x0258FaE58d52f8AD4508beEF1c40342b2E0CeD32";
-  const DE4I = "0x605B6EDD6A38f1D66C32E2A1D5d91DC2e9F12e44";
+  const NBLAD = "0x12F9A5DF81967257d623dce5859e3b0a67ae81cf";
+  const DE4I = "0xB399A547792fdE76920cc41A8B13F0E3F50E2004";
 
   // 2. Compile myIOPN_DEX source
   console.log("Compiling myIOPN_DEX.sol with solc...");

@@ -412,8 +412,57 @@ export default function App() {
     return () => clearInterval(interval);
   }, [walletState?.address, fetchOnChainBalances]);
 
-  // Sync state with node express backend
+  // Sync state with node express backend or local storage fallback (for static platforms like Vercel)
   const syncWalletState = useCallback(async (address: string, updatePayload?: Partial<WalletState>) => {
+    const getLocalFallback = (): WalletState => {
+      try {
+        const saved = localStorage.getItem(`myiopn_wallet_state_${address.toLowerCase()}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return {
+            ...parsed,
+            address // ensure syncing address matches
+          };
+        }
+      } catch (err) {
+        console.error("Failed to parse local storage wallet state", err);
+      }
+
+      return {
+        address,
+        balances: {
+          OPN: 0,
+          USDC: 0,
+          USDT: 0,
+          NBLAD: 0,
+          DE4I: 0
+        },
+        staking: {
+          usdcStaked: 0,
+          usdtStaked: 0,
+          usdcLastStakedTime: 0,
+          usdtLastStakedTime: 0,
+          nbladRewardDebt: 0,
+          de4iRewardDebt: 0,
+          rateUsdcNblad: 5,
+          rateUsdcDe4i: 2,
+          rateUsdtNblad: 4,
+          rateUsdtDe4i: 3
+        },
+        faucetClaims: {
+          USDC: 0,
+          USDT: 0
+        },
+        autoWithdrawThresholds: {
+          NBLAD: 10,
+          DE4I: 10,
+          enabled: false
+        },
+        logs: []
+      };
+    };
+
+    let syncSucceeded = false;
     try {
       const payload: any = { address };
       if (updatePayload) {
@@ -428,10 +477,50 @@ export default function App() {
 
       if (res.ok) {
         const reply = await res.json();
-        setWalletState(reply.data);
+        if (reply && reply.data) {
+          setWalletState(reply.data);
+          syncSucceeded = true;
+          try {
+            localStorage.setItem(`myiopn_wallet_state_${address.toLowerCase()}`, JSON.stringify(reply.data));
+          } catch (_) {}
+        }
       }
     } catch (err) {
-      console.warn("Express synchronization temporarily unavailable, operating client-side.");
+      console.warn("Express synchronization failed/timed out, falling back to local client state.");
+    }
+
+    if (!syncSucceeded) {
+      // Execute purely on client side
+      const currentLocal = getLocalFallback();
+      const nextLocal: WalletState = {
+        ...currentLocal,
+        ...(updatePayload || {})
+      };
+
+      // Handle deep fields merge
+      if (updatePayload) {
+        if (updatePayload.balances) {
+          nextLocal.balances = { ...currentLocal.balances, ...updatePayload.balances };
+        }
+        if (updatePayload.staking) {
+          nextLocal.staking = { ...currentLocal.staking, ...updatePayload.staking };
+        }
+        if (updatePayload.faucetClaims) {
+          nextLocal.faucetClaims = { ...currentLocal.faucetClaims, ...updatePayload.faucetClaims };
+        }
+        if (updatePayload.autoWithdrawThresholds) {
+          nextLocal.autoWithdrawThresholds = { ...currentLocal.autoWithdrawThresholds, ...updatePayload.autoWithdrawThresholds };
+        }
+        if (updatePayload.logs) {
+          nextLocal.logs = updatePayload.logs;
+        }
+      }
+
+      try {
+        localStorage.setItem(`myiopn_wallet_state_${address.toLowerCase()}`, JSON.stringify(nextLocal));
+      } catch (_) {}
+      
+      setWalletState(nextLocal);
     }
   }, []);
 

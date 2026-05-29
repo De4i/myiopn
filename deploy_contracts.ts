@@ -83,105 +83,109 @@ async function main() {
   const USDC = "0xAe69efe47ad3b3AEE2Be0c3A6eeA2bA9bc4a9284";
   const USDT = "0xd79Cf114127bE55bDD96b608662109B277DaBF8d";
 
-  // 4. Deploy Custom Reward Tokens NBLAD and DE4I
+  // 4. Deploy Custom Reward Tokens NBLAD and DE4I concurrently
   const erc20Factory = new ethers.ContractFactory(erc20Artifact.abi, erc20Artifact.evm.bytecode.object, wallet);
-  
-  console.log("Deploying customized NBLAD Reward Token standard ERC-20...");
-  const nbladContract = await erc20Factory.deploy("Nebula Blade", "NBLAD", 1000000000n); // 1 Billion tokens
-  await nbladContract.waitForDeployment();
-  const NBLAD = await nbladContract.getAddress();
-  console.log(`NBLAD Reward Token deployed securely at: ${NBLAD}`);
+  let nonce = await wallet.getNonce();
+  console.log(`Starting token deployments at nonce: ${nonce}`);
 
-  console.log("Deploying customized DE4I Reward Token standard ERC-20...");
-  const de4iContract = await erc20Factory.deploy("Deity Quantum", "DE4I", 1000000000n); // 1 Billion tokens
-  await de4iContract.waitForDeployment();
+  const nbladDeployPromise = erc20Factory.deploy("Nebula Blade", "NBLAD", 1000000000n, { nonce: nonce++, gasLimit: 3000000 });
+  const de4iDeployPromise = erc20Factory.deploy("Deity Quantum", "DE4I", 1000000000n, { nonce: nonce++, gasLimit: 3000000 });
+
+  const [nbladContract, de4iContract] = await Promise.all([nbladDeployPromise, de4iDeployPromise]);
+
+  console.log("Waiting for tokens to deploy on-chain...");
+  await Promise.all([nbladContract.waitForDeployment(), de4iContract.waitForDeployment()]);
+
+  const NBLAD = await nbladContract.getAddress();
   const DE4I = await de4iContract.getAddress();
+  console.log(`NBLAD Reward Token deployed securely at: ${NBLAD}`);
   console.log(`DE4I Reward Token deployed securely at: ${DE4I}`);
 
   // 5. Deploy DEX Main Contract with newly generated reward coords
-  console.log("Deploying upgraded myIOPN_DEX contract on-chain...");
+  console.log(`Deploying upgraded myIOPN_DEX contract on-chain at nonce: ${nonce}...`);
   const dexFactory = new ethers.ContractFactory(dexArtifact.abi, dexArtifact.evm.bytecode.object, wallet);
-  const dexContract = await dexFactory.deploy(USDC, USDT, NBLAD, DE4I);
+  const dexContract = await dexFactory.deploy(USDC, USDT, NBLAD, DE4I, { nonce: nonce++, gasLimit: 5000000 });
   await dexContract.waitForDeployment();
   const DEX = await dexContract.getAddress();
   console.log(`myIOPN_DEX contract deployed securely at: ${DEX}`);
 
-  // 6. Fund the DEX contract with NBLAD and DE4I from our newly minted supply!
-  console.log("Funding newly deployed myIOPN_DEX staking rewards pool with 50,000,000 NBLAD and 50,000,000 DE4I...");
+  // 6. Fund the DEX contract and Approve spending in parallel!
+  console.log(`Executing concurrent reward funding and asset approvals at nonce: ${nonce}...`);
   
+  const nbladInt = new ethers.Contract(NBLAD, [
+    "function transfer(address to, uint256 amount) external returns (bool)",
+    "function approve(address spender, uint256 amount) external returns (bool)"
+  ], wallet);
+  const de4iInt = new ethers.Contract(DE4I, [
+    "function transfer(address to, uint256 amount) external returns (bool)",
+    "function approve(address spender, uint256 amount) external returns (bool)"
+  ], wallet);
+  const usdcInt = new ethers.Contract(USDC, [
+    "function approve(address spender, uint256 amount) external returns (bool)"
+  ], wallet);
+  const usdtInt = new ethers.Contract(USDT, [
+    "function approve(address spender, uint256 amount) external returns (bool)"
+  ], wallet);
+
   const transferAmt = ethers.parseUnits("50000000", 18);
-  const txFundNblad = await (nbladContract as any).transfer(DEX, transferAmt);
-  await txFundNblad.wait();
-  console.log("Funded NBLAD reward pool with 50,000,000 tokens of 18 decimals on-chain.");
+  const maxVal = ethers.MaxUint256;
 
-  const txFundDe4i = await (de4iContract as any).transfer(DEX, transferAmt);
-  await txFundDe4i.wait();
-  console.log("Funded DE4I reward pool with 50,000,000 tokens of 18 decimals on-chain.");
+  const [
+    txFundNblad,
+    txFundDe4i,
+    txApproveUsdc,
+    txApproveUsdt,
+    txApproveNblad,
+    txApproveDe4i
+  ] = await Promise.all([
+    nbladInt.transfer(DEX, transferAmt, { nonce: nonce++, gasLimit: 150000 }),
+    de4iInt.transfer(DEX, transferAmt, { nonce: nonce++, gasLimit: 150000 }),
+    usdcInt.approve(DEX, maxVal, { nonce: nonce++, gasLimit: 150000 }),
+    usdtInt.approve(DEX, maxVal, { nonce: nonce++, gasLimit: 150000 }),
+    nbladInt.approve(DEX, maxVal, { nonce: nonce++, gasLimit: 150000 }),
+    de4iInt.approve(DEX, maxVal, { nonce: nonce++, gasLimit: 150000 })
+  ]);
 
-  // 7. Approve assets and add initial pool liquidities
-  console.log("=== INITIATING PROTOCOL LIQUIDITY RESERVES INJECTION ===");
+  console.log("Waiting for transfers and approvals to clear...");
+  await Promise.all([
+    txFundNblad.wait(),
+    txFundDe4i.wait(),
+    txApproveUsdc.wait(),
+    txApproveUsdt.wait(),
+    txApproveNblad.wait(),
+    txApproveDe4i.wait()
+  ]);
+  console.log("Reward funding and absolute approvals completed.");
 
-  const erc20AbiSimple = [
-    "function approve(address spender, uint256 amount) external returns (bool)",
-    "function balanceOf(address account) view returns (uint256)",
-    "function decimals() view returns (uint8)"
-  ];
-  
-  const usdcInstance = new ethers.Contract(USDC, erc20AbiSimple, wallet);
-  const usdtInstance = new ethers.Contract(USDT, erc20AbiSimple, wallet);
-  const nbladInstance = new ethers.Contract(NBLAD, erc20AbiSimple, wallet);
-  const de4iInstance = new ethers.Contract(DE4I, erc20AbiSimple, wallet);
-  
+  // 7. Inject pool liquidities in parallel!
+  console.log(`Injecting pool liquidities concurrently at nonce: ${nonce}...`);
   const dexWithLiquidity = new ethers.Contract(DEX, [
     "function addLiquidity(address tokenA, address tokenB, uint256 amountA, uint256 amountB) external returns (uint256)"
   ], wallet);
 
-  // A. Approve USDT / USDC
-  console.log("Approving USDC & USDT for initial stable pool liquidity...");
-  const usdcApprovalAmt = ethers.parseUnits("5000000", 18);
-  const usdtApprovalAmt = ethers.parseUnits("5000000", 18);
-  
-  const approveUsdcTx = await usdcInstance.approve(DEX, usdcApprovalAmt);
-  await approveUsdcTx.wait();
-  
-  const approveUsdtTx = await usdtInstance.approve(DEX, usdtApprovalAmt);
-  await approveUsdtTx.wait();
-  
-  console.log("USDC and USDT approved successfully.");
-  
-  // B. Add Liquidity for USDC & USDT (1:1 stable pair)
-  console.log("Adding 5,000,000 USDC and 5,000,000 USDT liquidity (1:1 Stable Pool on-chain)...");
-  const liqUsdcUsdtTx = await dexWithLiquidity.addLiquidity(USDC, USDT, usdcApprovalAmt, usdtApprovalAmt);
-  await liqUsdcUsdtTx.wait();
-  console.log("Core USDC_USDT on-chain stable pool reserves structured successfully!");
-
-  // C. Add Liquidity for NBLAD & USDC (500,000 NBLAD and 100,000 USDC)
-  console.log("Approving and adding 500,000 NBLAD + 100,000 USDC pool reserves...");
+  const liqUsdcUsdtAmt = ethers.parseUnits("5000000", 18); // 5M USDC and USDT
   const nbladLiqAmt = ethers.parseUnits("500000", 18);
   const usdcLiqAmt = ethers.parseUnits("100000", 18);
-  
-  const approveNbladTx = await nbladInstance.approve(DEX, nbladLiqAmt);
-  await approveNbladTx.wait();
-  const approveUsdcForNbladTx = await usdcInstance.approve(DEX, usdcLiqAmt);
-  await approveUsdcForNbladTx.wait();
-  
-  const liqNbladUsdcTx = await dexWithLiquidity.addLiquidity(NBLAD, USDC, nbladLiqAmt, usdcLiqAmt);
-  await liqNbladUsdcTx.wait();
-  console.log("NBLAD_USDC on-chain reserves structured successfully!");
-
-  // D. Add Liquidity for DE4I & USDT (400,000 DE4I and 60,000 USDT)
-  console.log("Approving and adding 400,000 DE4I + 60,000 USDT pool reserves...");
   const de4iLiqAmt = ethers.parseUnits("400000", 18);
   const usdtLiqAmtForDe4i = ethers.parseUnits("60000", 18);
-  
-  const approveDe4iTx = await de4iInstance.approve(DEX, de4iLiqAmt);
-  await approveDe4iTx.wait();
-  const approveUsdtForDe4iTx = await usdtInstance.approve(DEX, usdtLiqAmtForDe4i);
-  await approveUsdtForDe4iTx.wait();
-  
-  const liqDe4iUsdtTx = await dexWithLiquidity.addLiquidity(DE4I, USDT, de4iLiqAmt, usdtLiqAmtForDe4i);
-  await liqDe4iUsdtTx.wait();
-  console.log("DE4I_USDT on-chain reserves structured successfully!");
+
+  const [
+    txAddLiq,
+    txAddNbladUsdcLiq,
+    txAddDe4iUsdtLiq
+  ] = await Promise.all([
+    dexWithLiquidity.addLiquidity(USDC, USDT, liqUsdcUsdtAmt, liqUsdcUsdtAmt, { nonce: nonce++, gasLimit: 300000 }),
+    dexWithLiquidity.addLiquidity(NBLAD, USDC, nbladLiqAmt, usdcLiqAmt, { nonce: nonce++, gasLimit: 300000 }),
+    dexWithLiquidity.addLiquidity(DE4I, USDT, de4iLiqAmt, usdtLiqAmtForDe4i, { nonce: nonce++, gasLimit: 300000 })
+  ]);
+
+  console.log("Waiting for pool liquidity setups to settle on-chain...");
+  await Promise.all([
+    txAddLiq.wait(),
+    txAddNbladUsdcLiq.wait(),
+    txAddDe4iUsdtLiq.wait()
+  ]);
+  console.log("All on-chain stable and reward token liquidities successfully established!");
 
   // Save coordinates to JSON
   const deployedObj = {

@@ -2,7 +2,7 @@ import { ethers } from "ethers";
 
 async function main() {
   const provider = new ethers.JsonRpcProvider("https://testnet-rpc.iopn.tech");
-  const faucetSigner = "0x5EA060321bC75C5e82B60Ff6E3F5482Fc6F04213";
+  const faucetSigner = "0xA7A6200A2Cb22EDD78E573C26AC30bb797ee2Cd9";
 
   const USDC = "0xAe69efe47ad3b3AEE2Be0c3A6eeA2bA9bc4a9284";
   const USDT = "0xd79Cf114127bE55bDD96b608662109B277DaBF8d";

@@ -50,19 +50,19 @@ To test the portal's on-chain operations, configure your Web3 browser wallet usi
 All integrated DeFi functions parse directly through the verified production contracts deployed on the IOPN Testnet:
 
 * 🧭 **DEX Router Address**:  
-  `0x49336536b03B8bBafdAb01a8CADA65123a803770`
+  `0x4e35Cdd63AbFB79Fe357ae6172b8A9E592D7Ce2f`
 * 🪙 **USDC Token (USD Stablecoin)**:  
   `0xAe69efe47ad3b3AEE2Be0c3A6eeA2bA9bc4a9284`
 * 🪙 **USDT Token (Tether USD Stablecoin)**:  
   `0xd79Cf114127bE55bDD96b608662109B277DaBF8d`
 * ⚡ **NBLAD Token (Nebula Blade Yield Asset)**:  
-  `0x0258FaE58d52f8AD4508beEF1c40342b2E0CeD32`
+  `0x12F9A5DF81967257d623dce5859e3b0a67ae81cf`
 * 🔮 **DE4I Token (Deity Quantum Yield Asset)**:  
-  `0x605B6EDD6A38f1D66C32E2A1D5d91DC2e9F12e44`
+  `0xB399A547792fdE76920cc41A8B13F0E3F50E2004`
 * 👨‍🍳 **MasterChef Staking Engine**:  
-  `0x49336536b03B8bBafdAb01a8CADA65123a803770`
+  `0x4e35Cdd63AbFB79Fe357ae6172b8A9E592D7Ce2f`
 * 🚰 **Network Token Faucet**:  
-  `0x49336536b03B8bBafdAb01a8CADA65123a803770`
+  `0x4e35Cdd63AbFB79Fe357ae6172b8A9E592D7Ce2f`
 
 ---
 
