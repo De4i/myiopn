@@ -22,6 +22,7 @@ import {
   Award
 } from "lucide-react";
 import { WalletState, MarketTelemetry, TokenSymbol, CONTRACTS, formatAmount } from "../types";
+import { ERC20_SOLIDITY_SOURCE, DEX_SOLIDITY_SOURCE } from "../contract_sources";
 
 interface DashboardProps {
   isLightTheme: boolean;
@@ -50,6 +51,8 @@ export default function Dashboard({
   const [isAddingLoading, setIsAddingLoading] = useState(false);
   const [isVerificationOpen, setIsVerificationOpen] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [solidityTab, setSolidityTab] = useState<"ERC20" | "DEX">("ERC20");
+  const [isCopiedSolidity, setIsCopiedSolidity] = useState(false);
 
   const handleCopy = (key: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -360,6 +363,72 @@ export default function Dashboard({
                   Keep compiler parameters: <strong>version v0.8.35+commit.47b9dedd</strong>, <strong>Optimizer Enabled</strong>, runs: <strong>200</strong>, and copy constructor hex blocks directly from above buttons.
                 </li>
               </ul>
+            </div>
+
+            {/* SOLIDITY CODE INTERACTIVE COPY CONSOLE */}
+            <div className={`border rounded-xl overflow-hidden font-mono text-xs ${
+              isLightTheme ? "bg-zinc-50 border-zinc-200" : "bg-zinc-950/80 border-cyan-500/10"
+            }`}>
+              {/* Terminal header / selector tabs */}
+              <div className="flex items-center justify-between px-4 py-2.5 bg-black/45 border-b border-zinc-900/40 font-sans">
+                <div className="flex items-center gap-2">
+                  <span className="flex gap-1.5">
+                    <span className="w-2 rounded-full h-2 bg-rose-500/80" />
+                    <span className="w-2 rounded-full h-2 bg-amber-500/80" />
+                    <span className="w-2 rounded-full h-2 bg-emerald-505/80" />
+                  </span>
+                  <p className="text-[9px] font-mono font-bold uppercase tracking-wider text-zinc-500 ml-1">Copier Console Panel</p>
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => setSolidityTab("ERC20")}
+                    className={`px-2.5 py-1 text-[9px] uppercase font-mono font-extrabold rounded-md border transition-all cursor-pointer ${
+                      solidityTab === "ERC20"
+                        ? "bg-cyan-500/15 text-cyan-400 border-cyan-405/20 font-black shadow-md"
+                        : "bg-transparent text-zinc-500 hover:bg-black/20 border-transparent hover:text-zinc-350"
+                    }`}
+                  >
+                    TestERC20_flattened.sol
+                  </button>
+                  <button
+                    onClick={() => setSolidityTab("DEX")}
+                    className={`px-2.5 py-1 text-[9px] uppercase font-mono font-extrabold rounded-md border transition-all cursor-pointer ${
+                      solidityTab === "DEX"
+                        ? "bg-cyan-500/15 text-cyan-400 border-cyan-405/20 font-black shadow-md"
+                        : "bg-transparent text-zinc-500 hover:bg-black/20 border-transparent hover:text-zinc-350"
+                    }`}
+                  >
+                    myIOPN_DEX_flattened.sol
+                  </button>
+                </div>
+              </div>
+
+              {/* Code viewer workspace */}
+              <div className="p-4 relative">
+                <div className="absolute top-3 right-3 z-10 flex gap-2">
+                  <button
+                    onClick={() => {
+                      const codeToCopy = solidityTab === "ERC20" ? ERC20_SOLIDITY_SOURCE : DEX_SOLIDITY_SOURCE;
+                      navigator.clipboard.writeText(codeToCopy);
+                      setIsCopiedSolidity(true);
+                      setTimeout(() => setIsCopiedSolidity(false), 2500);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-cyan-400 to-fuchsia-500 rounded-md text-[9px] font-mono font-bold text-black select-none uppercase hover:opacity-90 active:scale-95 transition-all cursor-pointer hover:shadow-cyan-450/40"
+                  >
+                    <Copy className="h-3 w-3" />
+                    {isCopiedSolidity ? "✓ Success! Copied to Clipboard" : "Copy Contract Source Code"}
+                  </button>
+                </div>
+
+                <div className="bg-black/60 border border-white/5 p-4 rounded-lg text-[9.5px] font-mono leading-relaxed overflow-x-auto max-h-[250px] text-zinc-300 select-all scrollbar-thin">
+                  <pre className="font-mono whitespace-pre">{solidityTab === "ERC20" ? ERC20_SOLIDITY_SOURCE : DEX_SOLIDITY_SOURCE}</pre>
+                </div>
+
+                <div className="mt-2 flex items-center justify-between text-[8px] text-zinc-550 uppercase tracking-widest px-1 font-mono font-bold">
+                  <span>File: {solidityTab === "ERC20" ? "TestERC20_flattened.sol" : "myIOPN_DEX_flattened.sol"}</span>
+                  <span>Size: {solidityTab === "ERC20" ? "2.0 KB | 48 lines" : "18.2 KB | 442 lines"}</span>
+                </div>
+              </div>
             </div>
           </div>
         )}

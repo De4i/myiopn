@@ -18,13 +18,16 @@ import {
   Layers,
   ChevronRight,
   TrendingUp,
-  RefreshCw
+  RefreshCw,
+  Copy
 } from "lucide-react";
 import Header from "./components/Header";
 import Swap from "./components/Swap";
 import Pools from "./components/Pools";
 import Staking from "./components/Staking";
 import Dashboard from "./components/Dashboard";
+
+import { ERC20_SOLIDITY_SOURCE } from "./contract_sources";
 
 import { 
   TokenSymbol, 
@@ -98,6 +101,7 @@ export default function App() {
   const [tkDecimals, setTkDecimals] = useState<number>(18);
   const [tkColor, setTkColor] = useState<string>("from-cyan-400 to-fuchsia-600");
   const [deployedTokens, setDeployedTokens] = useState<Array<{ name: string; symbol: string; address: string; supply: number; decimals: number }>>([]);
+  const [isCopiedContractCode, setIsCopiedContractCode] = useState<boolean>(false);
 
   // Helper to trigger interactive popups
   const triggerNotification = useCallback((title: string, message: string, type: "success" | "info" | "warning" | "alert" = "info") => {
@@ -1796,6 +1800,57 @@ export default function App() {
                     </div>
 
                   </div>
+
+                  {/* SOLIDITY CODE BLOCK FOR EASY COPY & VERIFY */}
+                  <div className={`mt-6 border-t pt-6 ${
+                    isLightTheme ? "border-zinc-200" : "border-zinc-900"
+                  }`}>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                      <div>
+                        <h3 className="text-sm font-sans font-extrabold uppercase text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-500 flex items-center gap-2">
+                          <Terminal className="h-4 w-4 text-cyan-450 animate-pulse" />
+                          Solidity Compiler Verification Source (TestERC20.sol)
+                        </h3>
+                        <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mt-0.5">
+                          Copy the complete flattened code below to verify your contract instantly on explorer
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(ERC20_SOLIDITY_SOURCE);
+                          setIsCopiedContractCode(true);
+                          setTimeout(() => setIsCopiedContractCode(false), 2000);
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold uppercase transition-all duration-200 select-none cursor-pointer ${
+                          isCopiedContractCode
+                            ? "bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)] scale-[0.98]"
+                            : "bg-cyan-500 hover:bg-cyan-400 hover:scale-[1.02] text-black shadow-[0_0_10px_rgba(6,182,212,0.2)] active:scale-95"
+                        }`}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        {isCopiedContractCode ? "✓ Copied Source!" : "Copy ERC-20 Solidity"}
+                      </button>
+                    </div>
+
+                    <div className="relative rounded-xl border border-white/5 bg-zinc-950 overflow-hidden shadow-2xl">
+                      {/* Interactive window bar representation */}
+                      <div className="flex items-center justify-between px-4 py-2 bg-black/40 border-b border-white/5 font-mono text-[9px] text-zinc-500 select-none">
+                        <div className="flex items-center gap-1.5 font-mono">
+                          <span className="w-2.5 h-2.5 rounded-full bg-rose-500/60" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
+                          <span className="ml-1.5 font-bold tracking-tight text-zinc-400 uppercase font-mono">TestERC20.sol (Flattened Compiler Target)</span>
+                        </div>
+                        <span className="text-[8px] uppercase tracking-widest font-black text-cyan-400 font-mono">Solidity v0.8.20</span>
+                      </div>
+                      <div className="p-4 overflow-x-auto max-h-[300px] text-zinc-300 font-mono text-[10px] leading-relaxed select-all scrollbar-thin">
+                        <pre className="font-mono whitespace-pre">{ERC20_SOLIDITY_SOURCE}</pre>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
 
               </div>
