@@ -283,11 +283,23 @@ export default function App() {
         "function getUserLPShares(address tokenA, address tokenB, address user) external view returns (uint256)"
       ], provider);
 
-      const poolsToFetch = [
-        { key: "USDC_USDT", tokenA: CONTRACTS.USDC, tokenB: CONTRACTS.USDT },
-        { key: "NBLAD_USDC", tokenA: CONTRACTS.NBLAD, tokenB: CONTRACTS.USDC },
-        { key: "DE4I_USDT", tokenA: CONTRACTS.DE4I, tokenB: CONTRACTS.USDT },
-      ];
+      // Generate all combinations of non-OPN tokens dynamically
+      const tokenEntries = Object.entries(tokens).filter(([sym]) => sym !== "OPN") as [string, any][];
+      const poolsToFetch: { key: string; tokenA: string; tokenB: string }[] = [];
+      for (let i = 0; i < tokenEntries.length; i++) {
+        for (let j = i + 1; j < tokenEntries.length; j++) {
+          const [sym1, t1] = tokenEntries[i];
+          const [sym2, t2] = tokenEntries[j];
+          if (t1.address && t2.address) {
+            const sorted = [sym1, sym2].sort();
+            poolsToFetch.push({
+              key: `${sorted[0]}_${sorted[1]}`,
+              tokenA: sorted[0] === sym1 ? t1.address : t2.address,
+              tokenB: sorted[0] === sym1 ? t2.address : t1.address
+            });
+          }
+        }
+      }
 
       const reservesResults: Record<string, number> = {};
       const updatedPoolReserves: Record<string, { reserveA: number; reserveB: number; totalShares: number; userShares: number }> = {};

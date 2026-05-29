@@ -57,8 +57,9 @@ export default function Pools({
   const handleTokenAChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value as TokenSymbol;
     setTokenA(selected);
+    setAmountA("");
+    setAmountB("");
     if (selected === tokenB) {
-      // Prevent duplicates
       setTokenB(tokenA);
     }
   };
@@ -66,9 +67,32 @@ export default function Pools({
   const handleTokenBChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value as TokenSymbol;
     setTokenB(selected);
+    setAmountA("");
+    setAmountB("");
     if (selected === tokenA) {
-      // Prevent duplicates
       setTokenA(tokenB);
+    }
+  };
+
+  const handleAmountAChange = (valStr: string) => {
+    setAmountA(valStr);
+    const val = parseFloat(valStr);
+    if (!isNaN(val) && val > 0 && activePool.reserveA > 0 && activePool.reserveB > 0) {
+      const calculatedB = (val * activePool.reserveB) / activePool.reserveA;
+      setAmountB(parseFloat(calculatedB.toFixed(6)).toString());
+    } else if (!valStr) {
+      setAmountB("");
+    }
+  };
+
+  const handleAmountBChange = (valStr: string) => {
+    setAmountB(valStr);
+    const val = parseFloat(valStr);
+    if (!isNaN(val) && val > 0 && activePool.reserveA > 0 && activePool.reserveB > 0) {
+      const calculatedA = (val * activePool.reserveA) / activePool.reserveB;
+      setAmountA(parseFloat(calculatedA.toFixed(6)).toString());
+    } else if (!valStr) {
+      setAmountA("");
     }
   };
 
@@ -293,12 +317,17 @@ export default function Pools({
                 type="number"
                 placeholder="0.0"
                 value={amountA}
-                onChange={(e) => setAmountA(e.target.value)}
+                onChange={(e) => handleAmountAChange(e.target.value)}
                 className={`bg-transparent text-lg font-bold font-mono outline-none w-full border-none p-0 ${
                   isLightTheme ? "text-zinc-900" : "text-slate-100"
                 }`}
                 required
               />
+              {(!activePool.reserveA || !activePool.reserveB) && (
+                <div className="text-[8px] text-amber-500 font-mono mt-0.5">
+                  ⚠️ Initial ratio setter is ACTIVE.
+                </div>
+              )}
             </div>
 
             <div className={`p-4 rounded-xl border relative ${
@@ -309,12 +338,17 @@ export default function Pools({
                 type="number"
                 placeholder="0.0"
                 value={amountB}
-                onChange={(e) => setAmountB(e.target.value)}
+                onChange={(e) => handleAmountBChange(e.target.value)}
                 className={`bg-transparent text-lg font-bold font-mono outline-none w-full border-none p-0 ${
                   isLightTheme ? "text-zinc-900" : "text-slate-100"
                 }`}
                 required
               />
+              {(!activePool.reserveA || !activePool.reserveB) && parseFloat(amountA) > 0 && parseFloat(amountB) > 0 && (
+                <div className="text-[8px] text-cyan-400 font-mono mt-0.5">
+                  1 {tokenA} = {(parseFloat(amountB) / parseFloat(amountA)).toFixed(4)} {tokenB}
+                </div>
+              )}
             </div>
 
           </div>

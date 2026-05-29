@@ -15,7 +15,11 @@ import {
   Wallet,
   CheckCircle,
   HelpCircle,
-  ShieldAlert
+  ShieldAlert,
+  Copy,
+  ExternalLink,
+  FileCode,
+  Award
 } from "lucide-react";
 import { WalletState, MarketTelemetry, TokenSymbol, CONTRACTS, formatAmount } from "../types";
 
@@ -44,6 +48,14 @@ export default function Dashboard({
   const [isAddingToken, setIsAddingToken] = useState(false);
   const [customTokenAddress, setCustomTokenAddress] = useState("");
   const [isAddingLoading, setIsAddingLoading] = useState(false);
+  const [isVerificationOpen, setIsVerificationOpen] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopy = (key: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
 
   const handleAddTokenSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,6 +149,220 @@ export default function Dashboard({
             <p className={`font-bold mt-1 ${isLightTheme ? "text-emerald-700" : "text-emerald-400"}`}>~{telemetry?.gasGwei ?? "18"} Gwei (Low)</p>
           </div>
         </div>
+      </div>
+
+      {/* CONTRACTS REGISTRY & EXPLORER VERIFICATION CENTER */}
+      <div className={`p-6 border rounded-2xl transition-all duration-300 ${
+        isLightTheme ? "bg-white border-zinc-200 shadow-sm" : "bg-zinc-950/40 border-cyan-500/20 shadow-[0_0_20px_rgba(6,182,212,0.05)]"
+      }`}>
+        <button
+          onClick={() => setIsVerificationOpen(!isVerificationOpen)}
+          className="w-full flex justify-between items-center text-left cursor-pointer group"
+        >
+          <div className="space-y-1">
+            <h3 className={`text-sm font-mono font-black uppercase flex items-center gap-1.5 ${
+              isLightTheme ? "text-cyan-800" : "text-cyan-400"
+            }`}>
+              <Award className="h-4.5 w-4.5 text-yellow-500 animate-pulse" /> Explorer Contract Verification Core
+            </h3>
+            <p className="text-[10px] font-sans text-zinc-500 uppercase tracking-wider font-extrabold group-hover:text-cyan-400 transition-colors">
+              {isVerificationOpen ? "Close Control Hub Panel [▲]" : "Open Block Explorer Verification Codes, Flattened Source & Hex Arguments [▼]"}
+            </p>
+          </div>
+          <span className={`px-3 py-1.5 rounded-lg border text-[10px] font-mono font-black transition-all ${
+            isVerificationOpen 
+              ? "bg-rose-500/10 text-rose-400 border-rose-500/20" 
+              : "bg-cyan-500/10 text-cyan-400 group-hover:bg-cyan-500/25 border-cyan-500/20"
+          }`}>
+            {isVerificationOpen ? "CLOSE PANEL" : "EXPAND TOOLKIT"}
+          </span>
+        </button>
+
+        {isVerificationOpen && (
+          <div className="mt-6 pt-6 border-t border-dashed border-zinc-855 space-y-6">
+            <div className={`p-4 rounded-xl text-[11px] leading-relaxed font-sans ${
+              isLightTheme ? "bg-zinc-50 text-zinc-800" : "bg-cyan-950/20 text-cyan-200/90"
+            } border border-cyan-500/10`}>
+              We compiled and deployed your contract stack using <strong>Solidity v0.8.35+commit.47b9dedd</strong> with the Optimizer enabled at <strong>200 runs</strong>. Since the sandboxed node cannot make direct outgoing web requests to bypass the explorer's Cloudflare checks, we have structured the exact flattened source codes and custom hex parameters below so you can verify each contract instantly inside <a href="https://explorer.iopn.tech" target="_blank" rel="noopener noreferrer" className="underline text-cyan-400 font-extrabold hover:text-cyan-300">explorer.iopn.tech</a>!
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* DEX ROUTER CONTRACT */}
+              <div className={`p-4 rounded-xl border space-y-3 font-mono text-[10.5px] ${
+                isLightTheme ? "bg-zinc-50 border-zinc-200" : "bg-black/40 border-white/5"
+              }`}>
+                <div className="flex justify-between items-center border-b pb-1.5 border-dashed border-zinc-805">
+                  <span className="font-sans font-black uppercase text-xs text-yellow-500 flex items-center gap-1">🧭 myIOPN_DEX Router</span>
+                  <span className="text-[9px] bg-cyan-950/40 text-cyan-400 px-1.5 py-0.5 rounded border border-cyan-500/10 font-bold">DEX &amp; MasterChef</span>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-zinc-500 text-[8.5px] uppercase">Contract Address</p>
+                  <p className="font-mono text-xs select-all break-all">{CONTRACTS.DEX}</p>
+                </div>
+                <div className="space-y-1 text-[10px]">
+                  <p className="text-zinc-500 text-[8.5px] uppercase">Constructor Parameters</p>
+                  <div className="flex gap-2">
+                    <span className="text-zinc-400 select-all font-mono break-all line-clamp-1 flex-1 bg-black/60 p-1.5 rounded text-[9px] border border-white/5">
+                      000000000000000000000000ae69efe47ad3b3...
+                    </span>
+                    <button
+                      onClick={() => handleCopy("dex", "000000000000000000000000ae69efe47ad3b3aee2be0c3a6eea2ba9bc4a9284000000000000000000000000d79cf114127be55bdd96b608662109b277dabf8d00000000000000000000000012f9a5df81967257d623dce5859e3b0a67ae81cf000000000000000000000000b399a547792fde76920cc41a8b13f0e3f50e2004")}
+                      className="px-2.5 bg-cyan-950 hover:bg-cyan-850 border border-cyan-500/20 text-cyan-400 rounded text-[9.5px] font-sans py-0.5 cursor-pointer active:scale-95 font-black uppercase"
+                    >
+                      {copiedKey === "dex" ? "Copied" : "Copy Args"}
+                    </button>
+                  </div>
+                </div>
+                <div className="pt-2 flex justify-between gap-2">
+                  <a
+                    href="https://explorer.iopn.tech/address/0x4e35Cdd63AbFB79Fe357ae6172b8A9E592D7Ce2f"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 text-center py-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20 rounded font-sans text-[10px] font-extrabold uppercase flex items-center justify-center gap-1"
+                  >
+                    Open Explorer <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
+
+              {/* NBLAD REWARD TOKEN */}
+              <div className={`p-4 rounded-xl border space-y-3 font-mono text-[10.5px] ${
+                isLightTheme ? "bg-zinc-50 border-zinc-200" : "bg-black/40 border-white/5"
+              }`}>
+                <div className="flex justify-between items-center border-b pb-1.5 border-dashed border-zinc-805">
+                  <span className="font-sans font-black uppercase text-xs text-yellow-500 flex items-center gap-1">⚡ NBLAD Token</span>
+                  <span className="text-[9px] bg-purple-950/40 text-purple-400 px-1.5 py-0.5 rounded border border-purple-500/10 font-bold">Yield Asset NBLAD</span>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-zinc-500 text-[8.5px] uppercase">Contract Address</p>
+                  <p className="font-mono text-xs select-all break-all">{CONTRACTS.NBLAD}</p>
+                </div>
+                <div className="space-y-1 text-[10px]">
+                  <p className="text-zinc-500 text-[8.5px] uppercase">Constructor Parameters</p>
+                  <div className="flex gap-2">
+                    <span className="text-zinc-400 select-all font-mono break-all line-clamp-1 flex-1 bg-black/60 p-1.5 rounded text-[9px] border border-white/5">
+                      00000000000000000000000000000000000000...
+                    </span>
+                    <button
+                      onClick={() => handleCopy("nblad", "000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000003b9aca00000000000000000000000000000000000000000000000000000000000000000c4e6562756c6120426c616465000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000054e424c4144000000000000000000000000000000000000000000000000000000")}
+                      className="px-2.5 bg-cyan-950 hover:bg-cyan-850 border border-cyan-500/20 text-cyan-400 rounded text-[9.5px] font-sans py-0.5 cursor-pointer active:scale-95 font-black uppercase"
+                    >
+                      {copiedKey === "nblad" ? "Copied" : "Copy Args"}
+                    </button>
+                  </div>
+                </div>
+                <div className="pt-2 flex justify-between gap-2">
+                  <a
+                    href={`https://explorer.iopn.tech/address/${CONTRACTS.NBLAD}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 text-center py-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20 rounded font-sans text-[10px] font-extrabold uppercase flex items-center justify-center gap-1"
+                  >
+                    Open Explorer <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
+
+              {/* DE4I REWARD TOKEN */}
+              <div className={`p-4 rounded-xl border space-y-3 font-mono text-[10.5px] ${
+                isLightTheme ? "bg-zinc-50 border-zinc-200" : "bg-black/40 border-white/5"
+              }`}>
+                <div className="flex justify-between items-center border-b pb-1.5 border-dashed border-zinc-805">
+                  <span className="font-sans font-black uppercase text-xs text-yellow-505 flex items-center gap-1">🔮 DE4I Token</span>
+                  <span className="text-[9px] bg-amber-950/40 text-amber-500 px-1.5 py-0.5 rounded border border-amber-500/10 font-bold">Yield Asset DE4I</span>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-zinc-500 text-[8.5px] uppercase">Contract Address</p>
+                  <p className="font-mono text-xs select-all break-all">{CONTRACTS.DE4I}</p>
+                </div>
+                <div className="space-y-1 text-[10px]">
+                  <p className="text-zinc-500 text-[8.5px] uppercase">Constructor Parameters</p>
+                  <div className="flex gap-2">
+                    <span className="text-zinc-400 select-all font-mono break-all line-clamp-1 flex-1 bg-black/60 p-1.5 rounded text-[9px] border border-white/5">
+                      00000000000000000000000000000000000000...
+                    </span>
+                    <button
+                      onClick={() => handleCopy("de4i", "000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000003b9aca000000000000000000000000000000000000000000000000000000000000000a477265617420494f504e00000000000000000000000000000000000000000000000000000000000000000000000547494f504e0000000000000000000000")}
+                      className="px-2.5 bg-cyan-950 hover:bg-cyan-850 border border-cyan-500/20 text-cyan-400 rounded text-[9.5px] font-sans py-0.5 cursor-pointer active:scale-95 font-black uppercase"
+                    >
+                      {copiedKey === "de4i" ? "Copied" : "Copy Args"}
+                    </button>
+                  </div>
+                </div>
+                <div className="pt-2 flex justify-between gap-2">
+                  <a
+                    href={`https://explorer.iopn.tech/address/${CONTRACTS.DE4I}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 text-center py-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20 rounded font-sans text-[10px] font-extrabold uppercase flex items-center justify-center gap-1"
+                  >
+                    Open Explorer <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
+
+              {/* GREAT IOPN TOKEN */}
+              <div className={`p-4 rounded-xl border space-y-3 font-mono text-[10.5px] ${
+                isLightTheme ? "bg-zinc-50 border-zinc-200" : "bg-black/40 border-white/5"
+              }`}>
+                <div className="flex justify-between items-center border-b pb-1.5 border-dashed border-zinc-805">
+                  <span className="font-sans font-black uppercase text-xs text-yellow-505 flex items-center gap-1">🏦 Great IOPN Token</span>
+                  <span className="text-[9px] bg-cyan-950/40 text-cyan-400 px-1.5 py-0.5 rounded border border-cyan-500/10 font-bold">GIOPN Core Native</span>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-zinc-500 text-[8.5px] uppercase">Contract Address</p>
+                  <p className="font-mono text-xs select-all break-all">0x61f03a6d594218001C315Dd278B9024Ec4182235</p>
+                </div>
+                <div className="space-y-1 text-[10px]">
+                  <p className="text-zinc-500 text-[8.5px] uppercase">Constructor Parameters</p>
+                  <div className="flex gap-2">
+                    <span className="text-zinc-400 select-all font-mono break-all line-clamp-1 flex-1 bg-black/60 p-1.5 rounded text-[9px] border border-white/5">
+                      00000000000000000000000000000000000000...
+                    </span>
+                    <button
+                      onClick={() => handleCopy("great", "000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000003b9aca0000000000000000000000000000000000000000000000000000000000000000a477265617420494f504e00000000000000000000000000000000000000000000000000000000000000000000000547494f504e0000000000000000000000")}
+                      className="px-2.5 bg-cyan-950 hover:bg-cyan-850 border border-cyan-500/20 text-cyan-400 rounded text-[9.5px] font-sans py-0.5 cursor-pointer active:scale-95 font-black uppercase"
+                    >
+                      {copiedKey === "great" ? "Copied" : "Copy Args"}
+                    </button>
+                  </div>
+                </div>
+                <div className="pt-2 flex justify-between gap-2">
+                  <a
+                    href="https://explorer.iopn.tech/address/0x61f03a6d594218001C315Dd278B9024Ec4182235"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 text-center py-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20 rounded font-sans text-[10px] font-extrabold uppercase flex items-center justify-center gap-1"
+                  >
+                    Open Explorer <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-xl space-y-3 ${
+              isLightTheme ? "bg-yellow-50 text-amber-900 border-yellow-250" : "bg-yellow-500/5 text-amber-400/90 border-yellow-500/10"
+            } border`}>
+              <div className="text-[11.5px] font-sans font-black uppercase tracking-wider flex items-center gap-1">
+                <FileCode className="h-4 w-4" /> Solidity Files &amp; Setup Guide
+              </div>
+              <p className="text-[10.5px] font-sans leading-relaxed">
+                We have generated completely flattened, single-source Solidity files inside your project directory to allow a <strong>1-click verification copy-paste workflow</strong>:
+              </p>
+              <ul className="list-disc pl-4 space-y-2 text-[10px] font-sans">
+                <li>
+                  For <strong>Nebula Blade (NBLAD)</strong>, <strong>Deity Quantum (DE4I)</strong>, and <strong>Great IOPN (GIOPN)</strong>: Copy the code from the file <code className="bg-black/40 text-cyan-300 font-mono p-1 rounded">verification_helper/TestERC20_flattened.sol</code> in your project repository first.
+                </li>
+                <li>
+                  For <strong>myIOPN_DEX Router &amp; MasterChef</strong>: Copy the code from the file <code className="bg-black/40 text-cyan-300 font-mono p-1 rounded">verification_helper/myIOPN_DEX_flattened.sol</code> in your project repository.
+                </li>
+                <li>
+                  Keep compiler parameters: <strong>version v0.8.35+commit.47b9dedd</strong>, <strong>Optimizer Enabled</strong>, runs: <strong>200</strong>, and copy constructor hex blocks directly from above buttons.
+                </li>
+              </ul>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* FILTER BUTTONS */}
