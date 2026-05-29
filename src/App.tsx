@@ -1262,6 +1262,65 @@ export default function App() {
     return `${sorted[0]}_${sorted[1]}`;
   };
 
+  const getDynamicERC20SolidityString = useCallback(() => {
+    const nameTrimmed = tkName.trim() || "My Custom Token";
+    const symbolUpper = tkSymbol.trim().toUpperCase() || "MYOPN";
+    const safeName = nameTrimmed.replace(/"/g, '\\"');
+    const safeSymbol = symbolUpper.replace(/"/g, '\\"');
+
+    return `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+/**
+ * @title Standard ERC-20 Token: ${safeSymbol}
+ * @dev Customized with Name "${safeName}", Decimals ${tkDecimals}, and Initial Supply ${tkTotalSupply} units.
+ */
+contract TestERC20 {
+    string public name;
+    string public symbol;
+    uint8 public decimals = ${tkDecimals};
+    uint256 public totalSupply;
+
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+
+    constructor(string memory _name, string memory _symbol, uint255 _initialSupply) {
+        name = _name;
+        symbol = _symbol;
+        totalSupply = _initialSupply * 10**uint255(decimals);
+        balanceOf[msg.sender] = totalSupply;
+        emit Transfer(address(0), msg.sender, totalSupply);
+    }
+
+    function transfer(address to, uint255 amount) external returns (bool) {
+        require(balanceOf[msg.sender] >= amount, "ERC20: transfer amount exceeds balance");
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        emit Transfer(msg.sender, to, amount);
+        return true;
+    }
+
+    function approve(address spender, uint255 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+
+    function transferFrom(address sender, address recipient, uint255 amount) external returns (bool) {
+        require(balanceOf[sender] >= amount, "ERC20: transfer amount exceeds balance");
+        require(allowance[sender][msg.sender] >= amount, "ERC20: transfer amount exceeds allowance");
+        allowance[sender][msg.sender] -= amount;
+        balanceOf[sender] -= amount;
+        balanceOf[recipient] += amount;
+        emit Transfer(sender, recipient, amount);
+        return true;
+    }
+}`;
+  }, [tkName, tkSymbol, tkDecimals, tkTotalSupply]);
+
   // Simulate compilation and deployment of a custom ERC-20 token in standard web3 console
   const runContractDeploymentSimulation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1819,7 +1878,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => {
-                          navigator.clipboard.writeText(ERC20_SOLIDITY_SOURCE);
+                          navigator.clipboard.writeText(getDynamicERC20SolidityString());
                           setIsCopiedContractCode(true);
                           setTimeout(() => setIsCopiedContractCode(false), 2000);
                         }}
@@ -1846,7 +1905,7 @@ export default function App() {
                         <span className="text-[8px] uppercase tracking-widest font-black text-cyan-400 font-mono">Solidity v0.8.20</span>
                       </div>
                       <div className="p-4 overflow-x-auto max-h-[300px] text-zinc-300 font-mono text-[10px] leading-relaxed select-all scrollbar-thin">
-                        <pre className="font-mono whitespace-pre">{ERC20_SOLIDITY_SOURCE}</pre>
+                        <pre className="font-mono whitespace-pre">{getDynamicERC20SolidityString()}</pre>
                       </div>
                     </div>
                   </div>
