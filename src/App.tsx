@@ -44,8 +44,30 @@ import { ERC20_ABI, ERC20_BYTECODE } from "./erc20_contract";
 declare global {
   interface Window {
     ethereum?: any;
+    okxwallet?: any;
   }
 }
+
+// Utility to get the correct injected Web3 provider (supporting MetaMask, OKX Wallet, and multiple injected wallets)
+const getEVMProvider = () => {
+  if (typeof window === "undefined") return null;
+  const win = window as any;
+  if (win.okxwallet) {
+    return win.okxwallet;
+  }
+  if (win.ethereum) {
+    if (win.ethereum.providers && Array.isArray(win.ethereum.providers)) {
+      // Find OKX Wallet if available, then MetaMask, or fallback to the active one
+      const okx = win.ethereum.providers.find((p: any) => p.isOKXWallet);
+      if (okx) return okx;
+      const mm = win.ethereum.providers.find((p: any) => p.isMetaMask);
+      if (mm) return mm;
+      return win.ethereum.providers[0];
+    }
+    return win.ethereum;
+  }
+  return null;
+};
 
 export default function App() {
   const [isLightTheme, setIsLightTheme] = useState<boolean>(false);
@@ -54,6 +76,7 @@ export default function App() {
   // Wallet State
   const [walletState, setWalletState] = useState<WalletState | null>(null);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
+  const [isMobileSelectorOpen, setIsMobileSelectorOpen] = useState<boolean>(false);
   const [tokens, setTokens] = useState<Record<string, any>>(() => {
     try {
       const saved = localStorage.getItem("myiopn_custom_tokens");
@@ -543,16 +566,17 @@ export default function App() {
   // Connects actual wallet onto IOPN Testnet on-chain
   const connectWallet = async () => {
     setIsConnecting(true);
-    // Actual metamask Web3 Connection attempt
-    if (window.ethereum) {
+    // Actual MetaMask / OKX Web3 Connection attempt
+    const provider = getEVMProvider();
+    if (provider) {
       try {
-        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        const accounts = await provider.request({ method: "eth_requestAccounts" });
         if (accounts && accounts.length > 0) {
           const injectedAddress = accounts[0];
           await syncWalletState(injectedAddress);
           await fetchOnChainBalances(injectedAddress);
           triggerNotification(
-            "MetaMask Web3 Connected",
+            "Web3 Wallet Connected",
             `Successfully established connection with EVM address: ${injectedAddress.substring(0, 6)}...`,
             "success"
           );
@@ -562,35 +586,37 @@ export default function App() {
           }, 1200);
         }
       } catch (e: any) {
-        triggerNotification("Connection Blocked", e.message || "Failed to link MetaMask provider.", "warning");
+        triggerNotification("Connection Blocked", e.message || "Failed to link Web3 wallet provider.", "warning");
       }
     } else {
+      setIsMobileSelectorOpen(true);
       triggerNotification(
-        "Compatible Browser Wallet Required",
-        "Please open this app in an external browser tab and connect MetaMask / OKX Web3 browser wallet extension config.",
-        "warning"
+        "Wallet Selector Displayed",
+        "We've opened the mobile Web3 bridge options so you can connect seamlessly via OKX or MetaMask app.",
+        "info"
       );
     }
     setIsConnecting(false);
   };
 
   const setupIopnNetwork = async () => {
-    if (!window.ethereum) {
+    const provider = getEVMProvider();
+    if (!provider) {
       triggerNotification("No EVM Provider", "MetaMask or OKX wallet is not detected on this browser.", "warning");
       return;
     }
     try {
       // Try to switch to the chain (984 in hex is 0x3d8)
-      await window.ethereum.request({
+      await provider.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: "0x3d8" }]
       });
-      triggerNotification("Switched Network", "MetaMask successfully switched to IOPN Testnet.", "success");
+      triggerNotification("Switched Network", "Wallet successfully switched to IOPN Testnet.", "success");
     } catch (switchError: any) {
       // This error code indicates that the chain has not been added to MetaMask.
       if (switchError.code === 4902 || switchError.message?.includes("Unrecognized chain ID")) {
         try {
-          await window.ethereum.request({
+          await provider.request({
             method: "wallet_addEthereumChain",
             params: [
               {
@@ -606,7 +632,7 @@ export default function App() {
               }
             ]
           });
-          triggerNotification("Network Installed", "IOPN Testnet added and selected in MetaMask!", "success");
+          triggerNotification("Network Installed", "IOPN Testnet added and selected in Wallet!", "success");
         } catch (addError: any) {
           triggerNotification("Network Add Failed", addError.message || "Failed to add IOPN Testnet.", "warning");
         }
@@ -617,10 +643,11 @@ export default function App() {
   };
 
   const ensureCorrectNetwork = async () => {
-    if (!window.ethereum) {
+    const provider = getEVMProvider();
+    if (!provider) {
       throw new Error("Compatible wallet extension (MetaMask or OKX Web3) is required.");
     }
-    const browserProvider = new ethers.BrowserProvider(window.ethereum);
+    const browserProvider = new ethers.BrowserProvider(provider);
     const network = await browserProvider.getNetwork();
     
     // IOPN Testnet chain ID is 984 (hex: 0x3d8)
@@ -631,7 +658,7 @@ export default function App() {
       // Wait for network switch to take effect
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      const newProvider = new ethers.BrowserProvider(window.ethereum);
+      const newProvider = new ethers.BrowserProvider(provider);
       const newNetwork = await newProvider.getNetwork();
       if (newNetwork.chainId !== 984n) {
         throw new Error("Wrong Network! Please switch your wallet network to IOPN Testnet to execute this transaction.");
@@ -640,21 +667,22 @@ export default function App() {
   };
 
   const switchMetaMaskAccount = async () => {
-    if (!window.ethereum) {
+    const provider = getEVMProvider();
+    if (!provider) {
       triggerNotification("EVM Provider Missing", "MetaMask or OKX wallet is not detected on this browser.", "warning");
       return;
     }
     setIsConnecting(true);
     try {
-      triggerNotification("Permissions Requested", "Please select or check the desired wallet account in the MetaMask popup chooser.", "info");
+      triggerNotification("Permissions Requested", "Please select or check the desired wallet account in the popup chooser.", "info");
       
-      // Force MetaMask to show the account selection modal
-      await window.ethereum.request({
+      // Force account selection/request permissions
+      await provider.request({
         method: "wallet_requestPermissions",
         params: [{ eth_accounts: {} }]
       });
       
-      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      const accounts = await provider.request({ method: "eth_requestAccounts" });
       if (accounts && accounts.length > 0) {
         const injectedAddress = accounts[0];
         await syncWalletState(injectedAddress);
@@ -668,7 +696,7 @@ export default function App() {
         }, 1200);
       }
     } catch (e: any) {
-      triggerNotification("Switch Cancelled", e.message || "Failed to switch accounts in MetaMask.", "warning");
+      triggerNotification("Switch Cancelled", e.message || "Failed to switch accounts.", "warning");
     } finally {
       setIsConnecting(false);
     }
@@ -679,9 +707,10 @@ export default function App() {
     triggerNotification("Wallet Unlinked", "Disconnected current address and cleared active dashboard locks.", "info");
   };
 
-  // Register real-time MetaMask listeners to catch hot-switches immediately
+  // Register real-time MetaMask/OKX listeners to catch hot-switches immediately
   useEffect(() => {
-    if (window.ethereum) {
+    const provider = getEVMProvider();
+    if (provider) {
       const handleAccountsChanged = async (accounts: string[]) => {
         console.log("On-Chain accountsChanged detected:", accounts);
         if (accounts && accounts.length > 0) {
@@ -711,13 +740,15 @@ export default function App() {
         }, 1500);
       };
 
-      window.ethereum.on("accountsChanged", handleAccountsChanged);
-      window.ethereum.on("chainChanged", handleChainChanged);
+      if (provider.on) {
+        provider.on("accountsChanged", handleAccountsChanged);
+        provider.on("chainChanged", handleChainChanged);
+      }
 
       return () => {
-        if (window.ethereum.removeListener) {
-          window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
-          window.ethereum.removeListener("chainChanged", handleChainChanged);
+        if (provider.removeListener) {
+          provider.removeListener("accountsChanged", handleAccountsChanged);
+          provider.removeListener("chainChanged", handleChainChanged);
         }
       };
     }
@@ -809,9 +840,10 @@ export default function App() {
 
     // REAL ON-CHAIN METAMASK SWAP TRANSACTION
     try {
-      if (!window.ethereum) throw new Error("No ethereum provider found");
+      const provider = getEVMProvider();
+      if (!provider) throw new Error("No ethereum provider found");
       await ensureCorrectNetwork();
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = new ethers.BrowserProvider(provider);
       const signer = await browserProvider.getSigner();
 
       const tokenInConfig = tokens[tokenIn];
@@ -874,9 +906,10 @@ export default function App() {
 
     // REAL ON-CHAIN METAMASK TRANSACTION
     try {
-      if (!window.ethereum) throw new Error("No ethereum provider found");
+      const provider = getEVMProvider();
+      if (!provider) throw new Error("No ethereum provider found");
       await ensureCorrectNetwork();
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = new ethers.BrowserProvider(provider);
       const signer = await browserProvider.getSigner();
 
       const tokenAConfig = tokens[tokenA];
@@ -952,9 +985,10 @@ export default function App() {
 
     // REAL ON-CHAIN METAMASK TRANSACTION
     try {
-      if (!window.ethereum) throw new Error("No ethereum provider found");
+      const provider = getEVMProvider();
+      if (!provider) throw new Error("No ethereum provider found");
       await ensureCorrectNetwork();
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = new ethers.BrowserProvider(provider);
       const signer = await browserProvider.getSigner();
 
       const tokenAConfig = tokens[tokenA];
@@ -1002,9 +1036,10 @@ export default function App() {
 
     // REAL ON-CHAIN METAMASK STAKE TRANSACTION
     try {
-      if (!window.ethereum) throw new Error("No ethereum provider found");
+      const provider = getEVMProvider();
+      if (!provider) throw new Error("No ethereum provider found");
       await ensureCorrectNetwork();
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = new ethers.BrowserProvider(provider);
       const signer = await browserProvider.getSigner();
 
       const tokenAddress = token === "USDC" ? CONTRACTS.USDC : CONTRACTS.USDT;
@@ -1069,9 +1104,10 @@ export default function App() {
 
     // REAL ON-CHAIN METAMASK UNSTAKE TRANSACTION
     try {
-      if (!window.ethereum) throw new Error("No ethereum provider found");
+      const provider = getEVMProvider();
+      if (!provider) throw new Error("No ethereum provider found");
       await ensureCorrectNetwork();
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = new ethers.BrowserProvider(provider);
       const signer = await browserProvider.getSigner();
 
       const tokenAddress = token === "USDC" ? CONTRACTS.USDC : CONTRACTS.USDT;
@@ -1115,9 +1151,10 @@ export default function App() {
 
     // REAL ON-CHAIN METAMASK HARVEST REWARDS
     try {
-      if (!window.ethereum) throw new Error("No ethereum provider found");
+      const provider = getEVMProvider();
+      if (!provider) throw new Error("No ethereum provider found");
       await ensureCorrectNetwork();
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = new ethers.BrowserProvider(provider);
       const signer = await browserProvider.getSigner();
 
       const dexContract = new ethers.Contract(CONTRACTS.DEX, [
@@ -1177,10 +1214,11 @@ export default function App() {
   const handleUpdateRewardRates = async (usdcNblad: number, usdcDe4i: number, usdtNblad: number, usdtDe4i: number) => {
     if (!walletState) return;
     try {
-      if (!window.ethereum) throw new Error("No Web3 provider found");
+      const provider = getEVMProvider();
+      if (!provider) throw new Error("No Web3 provider found");
       await ensureCorrectNetwork();
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
+      const providerInstance = new ethers.BrowserProvider(provider);
+      const signer = await providerInstance.getSigner();
 
       const dexContract = new ethers.Contract(CONTRACTS.DEX, [
         "function setRewardRates(uint256 _usdcNblad, uint256 _usdcDe4i, uint256 _usdtNblad, uint256 _usdtDe4i) external"
@@ -1351,10 +1389,11 @@ contract TestERC20 {
     ]);
 
     try {
-      if (!window.ethereum) throw new Error("Compatible Web3 wallet (MetaMask or OKX) is required.");
+      const provider = getEVMProvider();
+      if (!provider) throw new Error("Compatible Web3 wallet (MetaMask or OKX) is required.");
       await ensureCorrectNetwork();
       
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
+      const browserProvider = new ethers.BrowserProvider(provider);
       const signer = await browserProvider.getSigner();
 
       setDeployConsoleLogs(prev => [
@@ -1955,6 +1994,124 @@ contract TestERC20 {
           </div>
         ))}
       </div>
+
+      {/* Mobile / Alternative Connecting Modal */}
+      {isMobileSelectorOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className={`relative w-full max-w-md rounded-2xl border p-6 overflow-hidden shadow-2xl ${
+            isLightTheme ? "bg-white border-zinc-200 text-zinc-900" : "bg-zinc-950 border-cyan-500/20 text-white"
+          }`}>
+            {/* Background radial gradient */}
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-fuchsia-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-5 border-b border-zinc-800 pb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+                <h3 className="font-sans font-extrabold uppercase text-xs tracking-wider">Connect Mobile / OKX Wallet</h3>
+              </div>
+              <button 
+                onClick={() => setIsMobileSelectorOpen(false)}
+                className="text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer text-xs uppercase font-mono font-bold"
+              >
+                [ Close ]
+              </button>
+            </div>
+
+            <p className="text-xs text-zinc-400 mb-6 leading-relaxed font-sans">
+              To ensure full compatibility with smartphone OKX Wallet or MetaMask dApp browsers, select one of the preferred connection paths below:
+            </p>
+
+            {/* Connection Buttons */}
+            <div className="space-y-3">
+              {/* Route 1: OKX Wallet App (Highly recommended for Android) */}
+              <button
+                type="button"
+                onClick={() => {
+                  const dappUrl = window.location.href;
+                  const okxAppUrl = `okx://download/dapp/browser?dappUrl=${encodeURIComponent(dappUrl)}`;
+                  // Attempt to redirect to Android/iOS okx browser app
+                  window.location.href = okxAppUrl;
+                  // Fallback to OKX download if it takes too long
+                  setTimeout(() => {
+                    window.open("https://www.okx.com/web3", "_blank");
+                  }, 2500);
+                }}
+                className="w-full flex items-center justify-between p-4 rounded-xl border border-white/5 bg-black/45 hover:bg-black/80 transition-all hover:scale-[1.01] hover:border-cyan-500/30 group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-zinc-900 flex items-center justify-center font-black text-white text-xs border border-white/10 group-hover:border-cyan-500/30">
+                    OKX
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold font-sans">Open in OKX Wallet App</p>
+                    <p className="text-[10px] text-zinc-500 font-mono">Direct deep link for Android/iOS</p>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-cyan-455 transition-colors" />
+              </button>
+
+              {/* Route 2: MetaMask App */}
+              <button
+                type="button"
+                onClick={() => {
+                  const pureUrl = window.location.href.replace(/^https?:\/\//, "");
+                  const metamaskAppUrl = `metamask://dapp/${pureUrl}`;
+                  window.location.href = metamaskAppUrl;
+                  // Fallback
+                  setTimeout(() => {
+                    window.open("https://metamask.io/download/", "_blank");
+                  }, 2500);
+                }}
+                className="w-full flex items-center justify-between p-4 rounded-xl border border-white/5 bg-black/45 hover:bg-black/80 transition-all hover:scale-[1.01] hover:border-fuchsia-500/30 group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-orange-600/10 flex items-center justify-center font-black text-orange-500 text-sm border border-orange-500/20 group-hover:border-fuchsia-500/30">
+                    🦊
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold font-sans">Open in MetaMask App</p>
+                    <p className="text-[10px] text-zinc-500 font-mono">Launch dApp browser automatically</p>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-zinc-500 group-hover:text-fuchsia-455 transition-colors" />
+              </button>
+
+              {/* Route 3: Manual link copier */}
+              <div className="p-4 rounded-xl border border-white/5 bg-black/20 text-center relative overflow-hidden">
+                <p className="text-[10px] text-zinc-400 mb-2 font-sans select-none">
+                  Or copy the dApp URL and open it manually inside your wallet's built-in browser:
+                </p>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="text" 
+                    readOnly 
+                    value={window.location.href}
+                    className="w-full bg-cyan-950/20 border border-cyan-500/10 rounded-lg px-2.5 py-1.5 text-[9px] font-mono text-zinc-300 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.href);
+                      triggerNotification("Link Copied", "Paste this URL inside your Web3 Wallet App Browser!", "success");
+                    }}
+                    className="px-3 py-1.5 bg-gradient-to-r from-cyan-400 to-fuchsia-500 rounded-lg text-[9px] font-bold text-black uppercase cursor-pointer hover:opacity-90 active:scale-95 transition-all whitespace-nowrap"
+                  >
+                    Copy URL
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 text-center">
+              <span className="text-[8px] text-zinc-600 font-mono uppercase tracking-widest">
+                myIOPN Mobile Web3 Bridge v1.2
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
