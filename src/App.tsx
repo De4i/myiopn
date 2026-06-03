@@ -765,15 +765,15 @@ export default function App() {
       const rpcProvider = new ethers.JsonRpcProvider("https://testnet-rpc.iopn.tech");
       const faucetSigner = new ethers.Wallet(customPrivateKey, rpcProvider);
       
-      // Step 1: Check OPN Native Balance of user, refund 0.2 OPN gracefully so they can register swaps/staking transactions!
+      // Step 1: Check OPN Native Balance of user, refund 0.01 OPN gracefully so they can register swaps/staking transactions!
       const userNativeBal = await rpcProvider.getBalance(walletState.address);
-      const threshold = ethers.parseEther("0.1");
+      const threshold = ethers.parseEther("0.01");
       if (userNativeBal < threshold) {
         try {
-          triggerNotification("Gas Refund Info", "Sponsoring 0.2 OPN native test gas coins directly...", "info");
+          triggerNotification("Gas Refund Info", "Sponsoring 0.01 OPN native test gas coins directly...", "info");
           const gasTx = await faucetSigner.sendTransaction({
             to: walletState.address,
-            value: ethers.parseEther("0.2")
+            value: ethers.parseEther("0.01")
           });
           await gasTx.wait();
         } catch (gasErr: any) {
